@@ -116,8 +116,10 @@ Fórmula (datasheet NXP 74HC123, válida para Cext > 10 nF; K = 0,45 em 5 V, 100
 
 | Ref. | Valor | Especificação | Observação |
 |---|---|---|---|
-| R27, R28 | **120 kΩ** | 0805, ±0,1%, 25 ppm/°C | ex.: Yageo RT0805BRD07120KL (a variante RT0805BRE07120KL é de 50 ppm/°C e a RT0805DRD07120KL é de 0,5%); mesmo footprint 0805 |
-| C15, C18 | **100 nF** | C0G/NP0, ±5% (ou melhor), 50 V, **1206** | LCSC: Murata GRM31C5C1H104JA01L (C97946), Murata GRM3195C1H104JA05D (C363929), TDK C3216C0G1H104JT000N (C319186), Walsin 1206N104J500CT (C170182). **Não existe 100 nF C0G em 0805 nas buscas**: C15/C18 precisam passar de 0805 para 1206 no layout |
+| R27, R28 | **120 kΩ** | **1206**, ±0,1%, 25 ppm/°C, filme fino | LCSC: Yageo RT1206BRD07120KL (C136888) ou Yageo RP1206BRD07120KL (C6982931). Evitar RT1206FRD07120KL (±1%) e RT1206CRD07120KL (±0,25%) |
+| C15, C18 | **100 nF** | C0G/NP0, ±5% (ou melhor), 50 V, **1206** | LCSC: Murata GRM31C5C1H104JA01L (C97946), Murata GRM3195C1H104JA05D (C363929), TDK C3216C0G1H104JT000N (C319186), Walsin 1206N104J500CT (C170182) |
+
+Footprints dos quatro alterados para 1206 pelo projetista (mais oferta de 0,1% e de C0G nesse tamanho). Depois da mudança, refazer a verificação layout × netlist com os novos arquivos.
 
 R para tW = 6 ms conforme o K real (calibrar com a medição):
 
