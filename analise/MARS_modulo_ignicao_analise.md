@@ -95,7 +95,18 @@ Simulação DC (modelo simples; A disparado, B desligado, modo 12 V):
 
 No modo 5 V (Q7 ligado) não há problema: o nó comum fica em ≈ 0,15 V.
 
-Impacto: uma entrada de bobina com limiar de 2–3 V e impedância alta pode ser disparada pelo outro canal. Correção simples: colocar um diodo de sinal (BAS21) em série com cada zener (ânodo no ânodo do zener, catodo no coletor do Q7) e usar zeners de 4,3 V; ou usar um transistor de clamp por canal.
+Impacto: uma entrada de bobina com limiar de 2–3 V e impedância alta pode ser disparada pelo outro canal.
+
+**Correção recomendada: um BAS21C (catodo comum, o mesmo componente já usado em D2/D3/D8) em série com os dois zeners.** Ligação: pino 1 no ânodo do D14, pino 2 no ânodo do D13, pino 3 (catodo comum) no coletor do Q7. Com Q7 desligado, o diodo do canal que não disparou fica em reversa e bloqueia o acoplamento (V_B ≈ 0 V). O grampo do modo 5 V sobe cerca de 0,65–0,8 V, então troque os zeners:
+
+| Zener | Nível da saída no modo 5 V (simulado) |
+|---|---|
+| 4,7 V (atual, sem diodo) | ≈ 4,9 V |
+| 4,7 V + BAS21C | ≈ 5,6 V |
+| 4,3 V + BAS21C | ≈ 5,2 V |
+| 3,9 V + BAS21C | ≈ 4,8 V |
+
+A numeração 1/2 = ânodos e 3 = catodo comum é a do símbolo do projeto; confirme no datasheet do BAS21C-JS3 (ZRE, LCSC C779748) antes de desenhar. Na placa v1.1 é preciso separar o nó que liga os dois ânodos ao coletor do Q7 (retrabalho com fios); na próxima revisão, ajustar o layout. Alternativa mais cara: um transistor de clamp por canal.
 
 ### 3.5 Capacidade de acionamento
 
