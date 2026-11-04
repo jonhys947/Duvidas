@@ -46,7 +46,7 @@ Micro-Fit 12P ──┬─ 12V_IN ── SS56U ── +12V ── AP63205 (5 V) 
 CH32V203 ── PA6/PA7 (IGN_A/B) ─ AND PA1 (IGN_ENABLE) ─ AND janela 74HC123 ─ NPN+PNP ─ 1 kΩ ─ saída
 ```
 
-O MCU lê a posição do virabrequim (VR ou Hall), MAP e IAT, calcula avanço e dwell e gera os dois pulsos. A saída é um **sinal de comando** (12 V ou ≈ 5 V, impedância de 1 kΩ, ≤ ≈ 11 mA), para bobinas inteligentes ou igniters externos. Não aciona bobina simples.
+O MCU lê a posição do virabrequim (VR ou Hall), MAP e IAT, calcula avanço e dwell e gera os dois pulsos. A saída é um **sinal de comando** (12 V ou ≈ 5 V, impedância de 1 kΩ, ≤ ≈ 11 mA), para bobinas inteligentes ou igniters externos. Não aciona diretamente o primário de uma bobina simples, nem usando um canal só (ex.: sistema com distribuidor): o primário pede 5–10 A e gera 300–400 V na abertura, contra ≤ ≈ 11 mA pelo R21 de 1 kΩ e BC807 de 0,5 A / 45 V. Com um igniter ou IGBT externo entre a saída e a bobina, um canal atende uma bobina simples.
 
 Pinagem do MCU conferida com o datasheet do CH32V203 (LQFP32): VDD 1/17, OSC 2/3, NRST 4, VDDA 5, PA0–PB1 6–15, VSS 16/32, PA8–PA15 18–25, PB3–PB7 26–30, BOOT0 31 ✅.
 
