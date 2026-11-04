@@ -3,6 +3,8 @@
 **Arquivos:** `SCH/PCB_MARS_Modulo_Ignição_MOSFET_2026-11-04` (netlist, SVG, Gerbers, Pick&Place, BOM) e datasheet do STGB10NB37LZ (ST, jun/1999).
 **Função:** estágio de potência para bobinas simples, comandado pelas saídas `IGN_A_PROT`/`IGN_B_PROT` do módulo principal.
 
+**Decisão do projetista:** a placa de potência fica separada do módulo principal (a integração exigiria isolação de alta tensão, terra de potência e dissipação dentro da placa principal). Bobina inteligente continua sendo atendida diretamente pelo módulo principal.
+
 Legenda: ✅ confere · ⚠️ ressalva · ❌ problema.
 
 ---
