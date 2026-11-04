@@ -29,8 +29,10 @@ typedef struct {
 } ignition_t;
 
 void    ignition_init(ignition_t *ig);
-/* Recalcula avanço e dwell (chamar no laço principal, p.ex. a cada 5 ms). */
-void    ignition_update(ignition_t *ig, const config_t *c, uint16_t rpm, uint16_t map_kpa, int16_t iat_c);
+/* Recalcula avanço e dwell (chamar no laço principal, p.ex. a cada 5 ms).
+   vbat_mv = 0 quando a tensão não estiver disponível (usa config.vbat_default_mv). */
+void    ignition_update(ignition_t *ig, const config_t *c, uint16_t rpm, uint16_t map_kpa,
+                        int16_t iat_c, uint16_t vbat_mv);
 /* Chamar a cada dente válido. Preenche até 4 eventos que caem antes da próxima borda; retorna quantos. */
 uint8_t ignition_on_tooth(const ignition_t *ig, const config_t *c, const decoder_t *d,
                           uint32_t t_us, ign_event_t out[4]);

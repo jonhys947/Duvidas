@@ -94,7 +94,7 @@ static result_t run(const config_t *c, profile_t p, int n_rev, uint16_t map_kpa,
             dec_event_t ev = decoder_on_edge(&d, (uint32_t)t);
             if ((ev & DEC_EV_SYNC_GAINED) && r.sync_rev < 0) r.sync_rev = rev;
             if (ev & DEC_EV_TOOTH) {
-                ignition_update(&ig, c, decoder_rpm(&d), map_kpa, 25);
+                ignition_update(&ig, c, decoder_rpm(&d), map_kpa, 25, 13500);
                 if (ig.rev_cut) r.cut_seen = 1;
                 ign_event_t out[4];
                 uint8_t n = ignition_on_tooth(&ig, c, &d, (uint32_t)t, out);
@@ -165,6 +165,24 @@ static void test_rev_limit(const config_t *c)
     CHECK(r.cut_seen && r.dwells == 0, "limitador não cortou (%d dwells)", r.dwells);
 }
 
+static void test_dwell_voltage(const config_t *c)
+{
+    ignition_t ig; ignition_init(&ig);
+    ignition_update(&ig, c, 2000, 50, 25, 13500);
+    uint16_t d135 = ig.dwell_us;
+    ignition_update(&ig, c, 2000, 50, 25, 9000);
+    uint16_t d9 = ig.dwell_us;
+    ignition_update(&ig, c, 2000, 50, 25, 0);
+    uint16_t dnone = ig.dwell_us;
+    ignition_update(&ig, c, 6500, 50, 25, 8000);
+    uint16_t dhi = ig.dwell_us;
+    printf("dwell: %u us a 13,5 V, %u us a 9 V, %u us sem leitura, %u us a 6500 rpm/8 V\n", d135, d9, dnone, dhi);
+    CHECK(d135 == 2800 && d9 == 4400, "dwell por tensão (%u, %u)", d135, d9);
+    CHECK(dnone == 3200, "dwell sem leitura de tensão (%u)", dnone);
+    CHECK(dhi <= 3800, "teto por rotação não aplicado (%u)", dhi);
+    CHECK(d9 <= c->max_dwell_us, "dwell acima do máximo");
+}
+
 static void test_watchdog(const config_t *c)
 {
     ignition_t ig; ignition_init(&ig);
@@ -208,6 +226,7 @@ int main(void)
     test_cranking(&c);
     test_faults(&c);
     test_rev_limit(&c);
+    test_dwell_voltage(&c);
     test_watchdog(&c);
     printf("\n%d verificações, %d falhas\n", checks, fails);
     return fails ? 1 : 0;

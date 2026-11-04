@@ -16,7 +16,8 @@ void ignition_init(ignition_t *ig)
     }
 }
 
-void ignition_update(ignition_t *ig, const config_t *c, uint16_t rpm, uint16_t map_kpa, int16_t iat_c)
+void ignition_update(ignition_t *ig, const config_t *c, uint16_t rpm, uint16_t map_kpa,
+                     int16_t iat_c, uint16_t vbat_mv)
 {
     int16_t adv;
     if (rpm < c->crank_rpm) {
@@ -31,7 +32,10 @@ void ignition_update(ignition_t *ig, const config_t *c, uint16_t rpm, uint16_t m
     if (adv > 500)  adv = 500;
     ig->adv_deg10 = adv;
 
-    int32_t dw = table1d(c->dwell_rpm, c->dwell_us, DWELL_N, rpm);
+    if (vbat_mv == 0) vbat_mv = c->vbat_default_mv;
+    int32_t dw = table1d(c->dwell_mv, c->dwell_us_v, DWELLV_N, vbat_mv);
+    int32_t cap = table1d(c->dwell_rpm, c->dwell_us, DWELL_N, rpm);
+    if (dw > cap) dw = cap;
     if (dw > c->max_dwell_us) dw = c->max_dwell_us;
     /* cada canal dispara uma vez por volta: o dwell não pode comer o tempo mínimo desligado */
     if (rpm > 0) {

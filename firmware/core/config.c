@@ -69,10 +69,17 @@ void config_defaults(config_t *c)
     memcpy(c->iatc_c, iat_c, sizeof(iat_c));
     memcpy(c->iatc_deg10, iat_d, sizeof(iat_d));
 
-    static const uint16_t dw_rpm[DWELL_N] = {0, 500, 1000, 2000, 3000, 4000, 5000, 7000};
-    static const int16_t  dw_us[DWELL_N]  = {3500, 3500, 3000, 3000, 3000, 2800, 2600, 2400};
+    /* dwell por tensão (bobina típica; AJUSTAR conforme a bobina usada) */
+    static const uint16_t dv_mv[DWELLV_N] = {6000, 8000, 9000, 10000, 11000, 12000, 13500, 15000};
+    static const int16_t  dv_us[DWELLV_N] = {4800, 4800, 4400, 3900, 3500, 3200, 2800, 2500};
+    memcpy(c->dwell_mv, dv_mv, sizeof(dv_mv));
+    memcpy(c->dwell_us_v, dv_us, sizeof(dv_us));
+    /* teto por rotação (em rotação alta não há tempo nem necessidade de dwell longo) */
+    static const uint16_t dw_rpm[DWELL_N] = {0, 1000, 2000, 3000, 4000, 5000, 6000, 7000};
+    static const int16_t  dw_us[DWELL_N]  = {4800, 4800, 4800, 4500, 4200, 4000, 3800, 3600};
     memcpy(c->dwell_rpm, dw_rpm, sizeof(dw_rpm));
     memcpy(c->dwell_us, dw_us, sizeof(dw_us));
+    c->vbat_default_mv = 12000;   /* conservador: dwell um pouco maior que a 13,5 V */
 
     /* MAP da tabela FuelTech: 0,2 V = -0,85 bar (≈ 16 kPa abs), 4,7 V = 6 bar (≈ 701 kPa abs) */
     c->map_mv0 = 200;  c->map_kpa0 = 16;

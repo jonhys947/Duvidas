@@ -55,13 +55,14 @@ laço principal (≈ 5 ms): ADC (MAP, IAT) ──► ignition_update() (avanço,
 
 ## Configuração (`core/config.h`)
 
-Estrutura única com mágico, versão, tamanho e CRC-16, gravada na 24C256. Contém: ângulo do dente 0, tipo de bobina, limites (corte, partida, dwell máximo), mapa de avanço 16 (rpm) × 12 (MAP), correção por IAT, dwell por rotação e calibração do MAP e do NTC.
+Estrutura única com mágico, versão, tamanho e CRC-16, gravada na 24C256. Contém: ângulo do dente 0, tipo de bobina, limites (corte, partida, dwell máximo), mapa de avanço 16 (rpm) × 12 (MAP), correção por IAT, dwell por tensão com teto por rotação e calibração do MAP e do NTC.
 
 Os valores padrão servem só para bancada. **O ângulo do dente 0 (`tooth0_deg10`) precisa ser medido no motor** com lâmpada de ponto.
 
 ## Decisões e pendências
 
-- **Sem medição de tensão da bateria:** a placa não lê o 12 V, então o dwell depende só da rotação (tabela). Se quiser compensar tensão, é preciso um divisor do 12 V para um pino de ADC livre numa próxima revisão.
-- **ESP32-C3 no I2C:** o barramento já tem a EEPROM e os sensores com o CH32 como mestre. Proposta: o **CH32 continua como único mestre** e o ESP32-C3 entra como **escravo I2C** (endereço a definir, p.ex. 0x42). O CH32 consulta o ESP periodicamente, envia dados ao vivo e recebe blocos de mapa, valida o CRC e grava na 24C256. Dois mestres no mesmo barramento exigiriam arbitragem e travaria o acesso à EEPROM durante a ignição. Falta definir onde o ESP se liga fisicamente no SDA/SCL.
+- **Tensão da bateria:** virá de um **INA219** no mesmo I2C (endereço 0x40–0x4F) e também pelo CAN. O dwell sai de uma tabela por tensão, limitado por um teto por rotação e pelo máximo de 4,8 ms. Sem nenhuma leitura, usa `vbat_default_mv` (12,0 V, conservador). Prioridade entre INA219 e CAN a definir na camada de hardware.
+- **ESP32-C3 no I2C (decidido):** o **CH32 é o único mestre** e o ESP32-C3 é **escravo I2C**. O CH32 consulta o ESP periodicamente, envia dados ao vivo, recebe blocos de mapa, confere o CRC e grava na 24C256. O endereço do ESP precisa ficar fora de 0x38 (AHT20), 0x40–0x4F (INA219), 0x50–0x57 (24C256) e 0x76/0x77 (BMP280); sugestão **0x30**. Falta definir onde o ESP se liga fisicamente no SDA/SCL.
+- **Endereços no I2C:** 0x30 ESP32-C3 (proposto), 0x38 AHT20, 0x40 INA219 (padrão, A0/A1 em GND), 0x50 24C256, 0x76 BMP280.
 - **CAN:** camada separada; tabela de mensagens fica para quando os consumidores forem definidos.
 - **Compilação/gravação:** toolchain RISC-V + SDK da WCH na linha de comando, gravação pelo WCH-LinkE, no PC Linux que será disponibilizado.

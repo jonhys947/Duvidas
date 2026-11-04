@@ -5,11 +5,12 @@
 #include <stdint.h>
 
 #define CFG_MAGIC    0x4D415253u   /* "MARS" */
-#define CFG_VERSION  1u
+#define CFG_VERSION  2u
 
 #define ADV_NX 16   /* eixo de rotação */
 #define ADV_NY 12   /* eixo de MAP */
 #define DWELL_N 8
+#define DWELLV_N 8
 #define IATC_N  8
 
 typedef enum {
@@ -44,9 +45,14 @@ typedef struct {
     uint16_t iatc_c[IATC_N];      /* °C + 40 (para caber em unsigned) */
     int16_t  iatc_deg10[IATC_N];
 
-    /* dwell em µs por rotação (a placa não mede a tensão da bateria) */
+    /* dwell em µs pela tensão da bateria (INA219 local ou CAN) */
+    uint16_t dwell_mv[DWELLV_N];
+    int16_t  dwell_us_v[DWELLV_N];
+    /* teto de dwell por rotação (µs), aplicado depois da tabela de tensão */
     uint16_t dwell_rpm[DWELL_N];
     int16_t  dwell_us[DWELL_N];
+    uint16_t vbat_default_mv;     /* usado quando nem o INA219 nem o CAN informam a tensão */
+    uint16_t reserved1;
 
     /* sensor MAP: reta entre dois pontos de tensão no pino do sensor (mV) */
     uint16_t map_mv0, map_kpa0;
