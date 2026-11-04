@@ -349,3 +349,18 @@ Zener 4,3 V + BAS21C + Vce(sat) do Q7 → **≈ 5,1 V** típico. Pela listagem d
 5. Pinagem física do módulo U11 (AHT20+BMP280) e do conector U12 (Micro-Fit).
 6. Proteção do CAN (D1 SMBJ24CA) acima do máximo absoluto do SN65HVD230 (16 V).
 7. Hall sem histerese; `CKP_CAPTURE` com ≈ 50 mm de trilha em 4,7 kΩ; NPTH de 3 mm a ≈ 0,3 mm da borda.
+
+---
+
+## 11. Revisão 3 (Gerbers gerados às 12:03, PnP "CH32V_v1.1")
+
+**Mudanças em relação à revisão 2:** só R27, R28, C15 e C18 passaram para 1206, e R27/R28 de 100 kΩ para 120 kΩ. Netlist sem nenhuma alteração de ligação. Cobre alterado apenas na face superior, em x 57,5–70,2 mm, y −66,7…−50,5 mm (região desses quatro componentes); nenhum furo adicionado ou removido; ≈ 1,7 mm até a borda da placa.
+
+**Verificação layout × netlist:** 94 componentes de 2 pinos, transistores e CIs verificáveis sem curtos nem abertos ✅.
+
+**❌ Erros no BOM (corrigir antes de pedir montagem):**
+
+| Ref. | No BOM | Problema | Corrigir para |
+|---|---|---|---|
+| C15, C18 | Walsin 0805B104J101CT (LCSC C116837) | É um **X7R em 0805**, colocado num footprint 1206. A montadora vai soldar X7R (ou recusar o encaixe) e o ganho do C0G se perde | 100 nF **C0G** 1206, ex.: Murata GRM31C5C1H104JA01L (C97946) |
+| R27, R28 | 120k, sem fabricante nem código | A montadora escolhe um resistor genérico (normalmente 1%, 100–200 ppm/°C) | Yageo RT1206BRD07120KL (C136888) ou RP1206BRD07120KL (C6982931) |
