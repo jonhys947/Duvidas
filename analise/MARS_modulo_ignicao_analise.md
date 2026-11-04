@@ -110,6 +110,25 @@ Consequências:
 
 **Como medir.** Segurar `IGN_A` em nível alto por ~20 ms e medir a largura do pulso em U9 pino 13 (1Q) e em `IGN_A_PROT`; repetir com spray frio/soprador e com 3V3 ligeiramente diferente. K = tW ÷ (Rext · Cext).
 
+#### 3.2.2 Valores escolhidos: tW nominal = 6 ms, com C0G e resistor 0,1%
+
+Fórmula (datasheet NXP 74HC123, válida para Cext > 10 nF; K = 0,45 em 5 V, 100 nF × 10 kΩ → 450 µs): `tW = K · Rext · Cext`. O K em 3,3 V (≈ 0,5) e o do clone LX não estão no datasheet.
+
+| Ref. | Valor | Especificação | Observação |
+|---|---|---|---|
+| R27, R28 | **120 kΩ** | 0805, ±0,1%, 25 ppm/°C | ex.: Yageo RT0805BRD07120KL (a variante RT0805BRE07120KL é de 50 ppm/°C e a RT0805DRD07120KL é de 0,5%); mesmo footprint 0805 |
+| C15, C18 | **100 nF** | C0G/NP0, ±5% (ou melhor), 50 V, **1206** | LCSC: Murata GRM31C5C1H104JA01L (C97946), Murata GRM3195C1H104JA05D (C363929), TDK C3216C0G1H104JT000N (C319186), Walsin 1206N104J500CT (C170182). **Não existe 100 nF C0G em 0805 nas buscas**: C15/C18 precisam passar de 0805 para 1206 no layout |
+
+R para tW = 6 ms conforme o K real (calibrar com a medição):
+
+| K medido | Rext ideal | Valor E96 mais próximo | tW resultante |
+|---|---|---|---|
+| 0,45 | 133,3 kΩ | 133 kΩ | 5,99 ms |
+| 0,50 | 120,0 kΩ | 120 kΩ | 6,00 ms |
+| 0,55 | 109,1 kΩ | 110 kΩ | 6,05 ms |
+
+Faixa esperada com esses componentes: resistor ±0,35% (0,1% + deriva), C0G ±5% + ±0,3% (ou ±1–2% se usar tolerância F/G), restando o K como maior incerteza (estimativa ±5–10%, não documentada para o clone). **Estimativa total ≈ ±7 a ±11% antes da calibração**, contra ≈ ±19% do projeto anterior. Montar a primeira placa com 120 kΩ, medir tW (seção 3.2.1), calcular K e ajustar Rext. O limite máximo esperado passa a ≈ 6,5–6,7 ms; confirme que a bobina suporta isso. Com tW mínimo ≈ 5,4 ms, o dwell máximo do firmware deve ficar em ≈ 4,8 ms ou menos.
+
 ### 3.3 Atraso e velocidade
 
 - Subida: IGN_A → saída ≈ 3–4 µs (filtro RC + portas + transistores). Irrelevante para dwell.
