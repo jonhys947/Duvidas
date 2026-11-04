@@ -358,9 +358,4 @@ Zener 4,3 V + BAS21C + Vce(sat) do Q7 → **≈ 5,1 V** típico. Pela listagem d
 
 **Verificação layout × netlist:** 94 componentes de 2 pinos, transistores e CIs verificáveis sem curtos nem abertos ✅.
 
-**❌ Erros no BOM (corrigir antes de pedir montagem):**
-
-| Ref. | No BOM | Problema | Corrigir para |
-|---|---|---|---|
-| C15, C18 | Walsin 0805B104J101CT (LCSC C116837) | É um **X7R em 0805**, colocado num footprint 1206. A montadora vai soldar X7R (ou recusar o encaixe) e o ganho do C0G se perde | 100 nF **C0G** 1206, ex.: Murata GRM31C5C1H104JA01L (C97946) |
-| R27, R28 | 120k, sem fabricante nem código | A montadora escolhe um resistor genérico (normalmente 1%, 100–200 ppm/°C) | Yageo RT1206BRD07120KL (C136888) ou RP1206BRD07120KL (C6982931) |
+**BOM:** usado só para os nomes dos componentes, a pedido do projetista; códigos de fabricante e fornecedor não foram avaliados. As peças pretendidas para R27/R28 (120 kΩ 0,1% 25 ppm/°C, 1206) e C15/C18 (100 nF C0G, 1206) estão na seção 3.2.2.
