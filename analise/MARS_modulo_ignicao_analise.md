@@ -13,7 +13,7 @@ O projeto é coerente e a maior parte funciona. O layout (PCB) **bate com a netl
 
 | # | Item | Gravidade |
 |---|---|---|
-| 1 | Saídas de ignição A e B se **acoplam no modo 12 V** (zeners D13/D14 com coletor do Q7 flutuando) | ❌ real, depende da entrada da bobina |
+| 1 | Saídas de ignição A e B se **acoplam no modo 12 V** (zeners D13/D14 com coletor do Q7 flutuando) | ✅ **corrigido na revisão 2** (BAS21C em D15, ver seção 10) |
 | 2 | Limitador de dwell (74HC123) fixado em ≈ 4,5–5,5 ms, com tolerância ampla | ⚠️ pode cortar dwell na partida/bateria baixa |
 | 3 | TVS de entrada SMCJ18A (VWM = 18 V) | ⚠️ não suporta jump-start de 24 V; em polaridade invertida o TVS entra em curto |
 | 4 | Módulo AHT20+BMP280 (U11) e conector Micro-Fit (U12) sem confirmação de pinagem física | ⚠️ conferir antes de ligar |
@@ -138,7 +138,7 @@ Os pinos PA15 e PB3 exigem remap do TIM2 para usar captura de entrada, e PA0 (TI
 | Bloco | Avaliação |
 |---|---|
 | **D6 SS56U** em série (proteção de inversão) | ✅ queda ≈ 0,4–0,55 V |
-| **D7 SMCJ18A** (TVS, VWM 18 V, VBR 20–22 V) | ⚠️ Na tensão de jump-start (24 V) o TVS conduz forte e pode queimar. Na **inversão de polaridade**, o TVS (antes do D6) fica em direta e **curto-circuita a bateria**: precisa de fusível externo. Mais comum: SMCJ24A e TVS depois do diodo |
+| **D7 SMCJ18A** (TVS, VWM 18 V, VBR 20–22 V) | ⚠️ Na tensão de jump-start (24 V) o TVS conduz forte e pode queimar. Na **inversão de polaridade**, o TVS (antes do D6) fica em direta e **curto-circuita a bateria**: precisa de fusível externo. Alternativa: SMCJ24A, mas o grampo dele (VC = 38,9 V) fica acima dos 32 V de operação do AP63205; conferir o máximo absoluto do regulador antes de escolher. Colocar o TVS depois do diodo evita o curto em inversão de polaridade |
 | **U5 AP63205** (5 V, 2 A) | ✅ FB ligado ao 5 V (versão fixa), EN em VIN, L1 4,7 µH, 2× 22 µF, BST 100 nF. É o circuito típico do datasheet (VIN 3,8–32 V). C29/C30 são 22 µF/16 V X5R: perdem capacitância com 5 V, mas ficam acima do mínimo útil |
 | **U4 AMS1117-3.3** | ✅ queda 1,7 V × ~0,12 A ≈ 0,2 W. C5 eletrolítico (ESR adequada ao LDO) |
 | **VDDA** | ✅ R5 10 Ω + 4,7 µF + 100 nF + 1 µF |
@@ -211,7 +211,7 @@ Polaridade dos diodos (serigrafia × netlist): D6, D13, D14 e D9 conferem ✅. O
 
 ### 7.2 O que não vai funcionar como projetado ❌
 
-1. **Saídas A/B isoladas no modo 12 V**: acoplamento via zeners D13/D14 (item 3.4).
+1. ~~Saídas A/B acopladas no modo 12 V (zeners D13/D14, item 3.4)~~: **resolvido na revisão 2** (seção 10). Nenhum item do circuito falha mais por projeto; restam apenas os riscos da seção 7.3.
 
 ### 7.3 O que pode falhar na prática ⚠️
 
@@ -243,3 +243,41 @@ Polaridade dos diodos (serigrafia × netlist): D6, D13, D14 e D9 conferem ✅. O
 - Layout: Gerbers lidos com gerbonara; cobre convertido em geometria; ligações camada a camada pelos furos; posições de pads inferidas do Pick&Place (pad 1 + passo). A verificação cobre passivos, SOT-23/323 e CIs principais; não cobre conectores nem U4/U5/U11.
 - Simulação do acoplamento (3.4) é um modelo DC simples (zener 4,7 V, queda direta 0,7 V). A faixa real depende da entrada da bobina.
 - **Não foi feita** simulação transitória, análise de EMC, medição real nem teste de bancada. O dwell (≈ 5 ms) vem da fórmula do datasheet e precisa de confirmação no osciloscópio.
+
+---
+
+## 10. Revisão 2 (arquivos `*_2`, Gerbers gerados às 11:08)
+
+### 10.1 O que mudou (comparado com a revisão 1)
+
+| Item | Antes | Agora |
+|---|---|---|
+| D13, D14 (zeners) | MM1Z4V7, SOD-123 | **MM3Z4V3** (ST, LCSC C61849), SOD-323 |
+| D15 | não existia | **BAS21C-JS3** (ZRE, C779748), SOT-23, catodo comum |
+| Rede `Q7_3` | ânodo D13 + ânodo D14 + coletor Q7 | separada em `D13_2` (D13.2 + D15.1), `D14_2` (D14.2 + D15.2) e `Q7_3` (Q7.3 + D15.3) |
+| Demais componentes e redes | – | **idênticos** (diferenças no BOM/PnP são só de nome: BAT54SW, BAT42W, SMAJ18A etc.) |
+
+Os Gerbers mudaram **somente** na região x 41–53 mm, y −52…−41 mm (zona de D13/D14/D15/Q7): 1 via removida, 2 vias adicionadas, retraçado local.
+
+### 10.2 Verificação
+
+- **Netlist:** única mudança é a descrita acima.
+- **Cobre × netlist (Gerbers v2):** D13.2 = D15.1, D14.2 = D15.2, D15.3 = Q7.3; as três redes são distintas entre si e não tocam GND nem as redes `IGN_x_PROT`. D13.1 está em `IGN_B_PROT`, D14.1 em `IGN_A_PROT`, Q7.2 em GND ✅.
+- **Verificação global:** 94 componentes de 2 pinos e os transistores/CIs verificáveis continuam sem curtos nem abertos ✅.
+- **Polaridade dos zeners novos:** a serigrafia do D13 (topo) e do D14 (fundo) marca o catodo no pad 1, que vai para `IGN_x_PROT` ✅.
+- **Pinagem do BAS21C:** o datasheet da SXSEMI (marcação JS3, a mesma do código `BAS21C-JS3`) mostra pinos 1 e 2 como ânodos e pino 3 como catodo comum; VRRM 250 V, fuga ≤ 0,1 µA a 200 V, trr ≤ 50 ns ✅. Não achei o datasheet da ZRE, só o da SXSEMI com a mesma marcação.
+- **Simulação DC (modo 12 V):** com o BAS21C bloqueando, o canal desligado fica em ≈ 0 V para qualquer impedância de entrada da bobina. O acoplamento de até 3,9 V da revisão 1 desaparece.
+
+### 10.3 Nível da saída no modo 5 V com os novos zeners
+
+Zener 4,3 V + BAS21C + Vce(sat) do Q7 → **≈ 5,1 V** típico. Pela listagem da LCSC o MM3Z4V3 (ST) tem Vz 4,0–4,6 V, então o nível real fica entre **≈ 4,8 e 5,4 V**. Confira se a entrada da bobina aceita até 5,4 V. Zzt listada: 130 Ω (a 5 mA; o grampo opera em ≈ 5–6 mA).
+
+### 10.4 Pendências (não mudaram)
+
+1. Dwell limitado a ≈ 5 ms (R27/R28 100 kΩ, C15/C18 100 nF X7R, clone LX).
+2. D7 SMCJ18A (jump-start de 24 V; inversão de polaridade via TVS). Ver nota sobre o clamp do SMCJ24A na seção 5.
+3. D4/D5 continuam SMAJ18A (VC = 29,2 V). SMAJ15A (VC = 24,4 V) ou SMAJ16A (26,0 V) protegem melhor o nó de saída; ver tabela da família SMAJ.
+4. D13/D14 agora são SOD-323 (listagens de 200 a 300 mW): menos robustos a surtos do chicote do que o SOD-123 de 500 mW.
+5. Pinagem física do módulo U11 (AHT20+BMP280) e do conector U12 (Micro-Fit).
+6. Proteção do CAN (D1 SMBJ24CA) acima do máximo absoluto do SN65HVD230 (16 V).
+7. Hall sem histerese; `CKP_CAPTURE` com ≈ 50 mm de trilha em 4,7 kΩ; NPTH de 3 mm a ≈ 0,3 mm da borda.
