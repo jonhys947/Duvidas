@@ -1,50 +1,54 @@
 # MARS – Módulo de Ignição (CH32V203K8T6) – Análise de circuito e PCB
 
-Arquivos analisados: esquemático (SVG + netlist PADS), BOM, Pick&Place, Gerbers v1.1 (2 camadas).
-Data dos arquivos: 2026-11-04. Título no esquemático: "STM32 IGNITION MODULE" (o MCU real é o **WCH CH32V203K8T6**, RISC-V).
+**Revisão analisada:** 3 (netlist/SVG `SCH_MARS_Modulo_Ignicao_2026-11-04`, Gerbers `PCB_MARS_Modulo_Ignicao_CH32V_v1.1` gerados às 12:03, Pick&Place `CH32V_v1.1`).
+**MCU:** WCH CH32V203K8T6 (RISC-V, LQFP32). O título do esquemático ainda diz "STM32 IGNITION MODULE".
 
-Legenda: ✅ funciona / confere · ⚠️ funciona, mas com ressalva ou precisa ser verificado · ❌ falha ou risco real.
+Legenda: ✅ confere · ⚠️ ressalva ou item a verificar · 🔒 decisão do projetista.
 
 ---
 
-## 1. Veredito
+## 1. Resumo
 
-O projeto é coerente e a maior parte funciona. O layout (PCB) **bate com a netlist** nos componentes verificados, sem curtos nem abertos. Os pontos que realmente precisam de atenção são poucos:
+O circuito está coerente e o layout corresponde à netlist: sem curtos e sem aberturas nos componentes verificáveis. A falha de projeto encontrada na primeira revisão (acoplamento entre as saídas A e B no modo 12 V) foi corrigida. O limitador de dwell foi redimensionado para 6 ms com componentes de precisão.
 
-| # | Item | Gravidade |
+O que ainda depende de verificação na bancada ou de conferência física:
+
+| # | Item | Situação |
 |---|---|---|
-| 1 | Saídas de ignição A e B se **acoplam no modo 12 V** (zeners D13/D14 com coletor do Q7 flutuando) | ✅ **corrigido na revisão 2** (BAS21C em D15, ver seção 10) |
-| 2 | Limitador de dwell (74HC123) fixado em ≈ 4,5–5,5 ms, com tolerância ampla | ⚠️ pode cortar dwell na partida/bateria baixa |
-| 3 | TVS de entrada SMCJ18A (VWM = 18 V) | ⚠️ não suporta jump-start de 24 V; em polaridade invertida o TVS entra em curto |
-| 4 | Módulo AHT20+BMP280 (U11) e conector Micro-Fit (U12) sem confirmação de pinagem física | ⚠️ conferir antes de ligar |
-| 5 | Proteção do CAN (SMBJ24CA) não protege o SN65HVD230 (máx. absoluto 16 V no barramento) | ⚠️ baixo para 12 V, ruim para 24 V |
-| 6 | Entrada de IAT com pull-up de 2,49 kΩ serve para ar (−20…100 °C), não para 100–180 °C | ⚠️ depende do uso |
+| 1 | K real do 74HC123 (clone LX) e largura do limitador | ⚠️ medir na primeira placa e ajustar R27/R28 se preciso (seção 3.3) |
+| 2 | Nível da saída no modo 5 V (≈ 4,8–5,4 V) | ⚠️ confirmar o máximo aceito pela entrada da bobina |
+| 3 | Pinagem física do módulo U11 (AHT20+BMP280) e do conector U12 (Micro-Fit) | ⚠️ conferir contra a peça e o chicote |
+| 4 | TVS do CAN: trocar o D1 por SMCJ8 | ⚠️ ainda não está nos arquivos; ver seção 5.2 |
+| 5 | Hall sem histerese; `CKP_CAPTURE` com ≈ 50 mm de trilha em 4,7 kΩ; NPTH a ≈ 0,3 mm da borda | ⚠️ menores |
 
-**Decisões do projetista (revisão 2), que prevalecem sobre as recomendações abaixo:**
+Decisões do projetista, que prevalecem sobre recomendações anteriores:
 
-- **D7 (SMCJ18A):** jump-start de 24 V e inversão de polaridade não existem na aplicação; preocupação descartada (itens 3 e a nota do SMCJ24A na seção 5 ficam como referência, sem ação).
-- **D4/D5 (SMAJ18A):** mantidos; a troca por SMAJ15A/16A não traz ganho que justifique.
-- **D13/D14 (MM3Z4V3, SOD-323):** mantidos.
-- **CAN (D1):** será trocado por um TVS SMCJ8 (ver 5.1).
+- 🔒 **D7 (SMCJ18A):** jump-start de 24 V e inversão de polaridade não existem na aplicação.
+- 🔒 **D4/D5 (SMAJ18A):** mantidos.
+- 🔒 **D13/D14 (MM3Z4V3, SOD-323):** mantidos.
+- 🔒 **TVS do CAN:** será SMCJ8.
+- 🔒 **BOM:** usado só para os nomes dos componentes; códigos de fabricante não foram avaliados.
 
 ---
 
-## 2. O que o circuito faz (visão geral)
+## 2. Arquitetura
 
 Módulo de ignição autônomo para motor de 4 cilindros em centelha perdida (duas saídas: cilindros 1-4 e 2-3).
 
 ```
-Conector Micro-Fit 12P ──┬─ 12V_IN ── SS56U (diodo série) ── +12V ── AP63205 (buck 5 V) ── AMS1117 (3,3 V)
-                         ├─ VR+ ──► NCV1124 (condicionador VR) ──► PB3
-                         ├─ HALLIN ──► Q5/Q6 (comparador a transistor) ──► PA15
-                         ├─ CKPIN ──► R 4,7k + clamp ──► PA0
-                         ├─ MAPSIG ──► divisor 10k/15k ──► PA2 (ADC)
-                         ├─ IATIN ──► NTC com pull-up 2,49k ──► PA3 (ADC)
-                         └─ CANH/CANL ──► SN65HVD230 ──► PA11/PA12
-CH32V203 ── PA6/PA7 (IGN_A/B) ─ AND com PA1 (IGN_ENABLE) ─ AND com janela do 74HC123 ─ NPN+PNP ─ 1 kΩ ─ saída
+Micro-Fit 12P ──┬─ 12V_IN ── SS56U ── +12V ── AP63205 (5 V) ── AMS1117 (3,3 V)
+                ├─ VR+ ──► NCV1124 ──► PB3
+                ├─ HALLIN ──► Q5/Q6 ──► PA15
+                ├─ CKPIN ──► 4,7 kΩ + clamp ──► PA0
+                ├─ MAPSIG ──► divisor 10k/15k ──► PA2 (ADC)
+                ├─ IATIN ──► NTC com pull-up 2,49 kΩ ──► PA3 (ADC)
+                └─ CANH/CANL ──► SN65HVD230 ──► PA11/PA12
+CH32V203 ── PA6/PA7 (IGN_A/B) ─ AND PA1 (IGN_ENABLE) ─ AND janela 74HC123 ─ NPN+PNP ─ 1 kΩ ─ saída
 ```
 
-O MCU lê posição do virabrequim (VR ou Hall), MAP e IAT, calcula avanço/dwell e gera os dois pulsos de ignição. A saída **não é um estágio de potência**: é um sinal de comando (12 V ou 5 V, impedância 1 kΩ) para bobinas inteligentes ou módulos igniters externos.
+O MCU lê a posição do virabrequim (VR ou Hall), MAP e IAT, calcula avanço e dwell e gera os dois pulsos. A saída é um **sinal de comando** (12 V ou ≈ 5 V, impedância de 1 kΩ, ≤ ≈ 11 mA), para bobinas inteligentes ou igniters externos. Não aciona bobina simples.
+
+Pinagem do MCU conferida com o datasheet do CH32V203 (LQFP32): VDD 1/17, OSC 2/3, NRST 4, VDDA 5, PA0–PB1 6–15, VSS 16/32, PA8–PA15 18–25, PB3–PB7 26–30, BOOT0 31 ✅.
 
 ---
 
@@ -52,127 +56,53 @@ O MCU lê posição do virabrequim (VR ou Hall), MAP e IAT, calcula avanço/dwel
 
 ### 3.1 Caminho do sinal (canal A; o B é idêntico)
 
-1. **PA6 (IGN_A)** e **PA1 (IGN_ENABLE)** entram em `U2` (74LVC2G08, AND). Saída: `IGN_A_ENABLED`.
-   - R9/R11/R12/R13 (47 kΩ) puxam as entradas para GND. No reset ou travamento o canal fica desligado ✅.
-2. `IGN_A_ENABLED` passa por R29 (4,7 kΩ) + C28 (1 nF) e dispara a entrada **1B do 74HC123 (U9)**. A entrada 1A# está em GND, então dispara na borda de subida de 1B.
-   - Atraso do filtro RC ≈ 3 µs (só no início do dwell; não afeta o ponto de centelha).
-3. A saída **1Q** (`DWELL_WINDOW_A`) fica em nível alto durante o tempo do monoestável.
-4. `U10` (AND) faz `IGN_A_LIMITED = IGN_A_ENABLED AND DWELL_WINDOW_A`.
-5. `Q1` (BC817) inverte e aciona `Q3` (BC807, PNP de alto lado, emissor em +12 V). Saída `IGN_A_RAW`.
-6. `D2` (BAS21C) + `R21` (1 kΩ) levam o sinal ao `IGN_A_PROT` (conector). `R22` (10 kΩ) mantém a saída em 0 V quando desligada. `D5` (SMAJ18A) protege contra surtos.
-7. **Modo de tensão:** `PA5 (SEL_5V)` liga o `Q7`. Com Q7 ligado, os zeners de 4,7 V (D13/D14) limitam a saída a ≈ 4,9 V. Com Q7 desligado a saída vai a ≈ 9–10 V (carga de 10 kΩ) ou até ≈ 11 V.
+1. `PA6 (IGN_A)` AND `PA1 (IGN_ENABLE)` em U2 (74LVC2G08) → `IGN_A_ENABLED`. Pull-downs de 47 kΩ mantêm o canal desligado no reset ✅.
+2. `IGN_A_ENABLED` passa por R29 4,7 kΩ + C28 1 nF (atraso ≈ 3 µs só no início do dwell) e dispara a entrada 1B do 74HC123 (U9), com 1A# em GND.
+3. A saída 1Q (`DWELL_WINDOW_A`) fica em nível alto durante tW.
+4. U10 (AND): `IGN_A_LIMITED = IGN_A_ENABLED AND DWELL_WINDOW_A`.
+5. Q1 (BC817) aciona Q3 (BC807, PNP de alto lado). Saída `IGN_A_RAW`.
+6. D2 (BAS21C) + R21 (1 kΩ) → `IGN_A_PROT` (conector). R22 10 kΩ mantém 0 V com o canal desligado; D5 (SMAJ18A) para surtos.
 
-### 3.2 O limitador de dwell
+### 3.2 Modos de tensão e grampo da saída
 
-Rext = 100 kΩ (R27/R28) a +3V3, Cext = 100 nF (C15/C18), Vcc = 3,3 V.
+`PA5 (SEL_5V)` liga o Q7:
 
-- Fórmula do 74HC123 (Cext > 10 nF): `tW = K · Rext · Cext`, com K ≈ 0,45 (5 V) a 0,55 (2 V). A 3,3 V, K ≈ 0,5.
-- **tW ≈ 0,5 × 100 kΩ × 100 nF ≈ 5 ms** (faixa 4,5–5,5 ms típica).
-- Tolerância real: C X7R ±5% inicial (Walsin 0805B104J101CT) mais ±15% com temperatura, resistor 1%, K variando com Vcc e com o fabricante. Esperar **≈ 3,6 a 6,6 ms** no pior caso.
-- O 74HC123 do BOM é **SN74HC123DR(LX)** (clone da Lingxing, LCSC C22449638): o K pode diferir do da TI. Meça com osciloscópio.
+- **Q7 desligado (modo 12 V):** saída ≈ 9–10 V com carga de 10 kΩ, até ≈ 11 V sem carga.
+- **Q7 ligado (modo 5 V):** cada saída é grampeada por zener 4,3 V (D13/D14, MM3Z4V3) + diodo do D15 (BAS21C) + Vce(sat) do Q7 → **≈ 5,1 V típico, 4,8–5,4 V** com a faixa de Vz de 4,0–4,6 V.
 
-Consequências:
+Ligação atual: D13 e D14 com catodo em `IGN_x_PROT`; ânodos em pinos separados do D15 (pinos 1 e 2, ânodos); pino 3 (catodo comum) no coletor do Q7. Com o Q7 desligado, o diodo do canal desligado fica em reversa e **bloqueia o acoplamento** entre as saídas (simulação DC: canal desligado ≈ 0 V para qualquer impedância de entrada da bobina) ✅.
 
-- Se o firmware pedir dwell acima de ≈ tW, o canal desliga em tW, **a centelha ocorre cedo** (no fim do limitador) e não no instante calculado.
-- Dwell típico de bobina inteligente é 2–4 ms a 13,5 V. Na partida (bateria 8–10 V) algumas bobinas pedem mais. O limite fixo ≈ 5 ms pode ser curto.
-- Recomendação: manter o dwell do firmware ≤ ≈ 3,5 ms, ou trocar R27/R28 por um valor/trimpot para ajustar o limite à bobina real.
-- Failsafe ✅: com o MCU travado em nível alto, a saída cai sozinha depois de tW, e no reset o canal fica desligado.
+Pinagem do BAS21C (pinos 1 e 2 ânodos, 3 catodo comum) confirmada pelo datasheet SXSEMI com marcação JS3, a mesma do código BAS21C-JS3 ✅.
 
-#### 3.2.1 Como ler o limite de ≈ 5 ms
+### 3.3 Limitador de dwell (tW nominal = 6 ms)
 
-**O que ele faz.** O 74HC123 é disparado pela borda de subida de `IGN_x_ENABLED` e mantém `DWELL_WINDOW_x` em nível alto por tW. A saída só fica ligada enquanto o MCU E a janela estão em nível alto. Se o MCU desce a linha antes de tW (caso normal), o limitador é invisível. Se o MCU ainda estiver em nível alto quando tW acaba, a saída cai por conta própria.
+**Função.** A saída só fica ligada enquanto o MCU **e** a janela do 74HC123 estão em nível alto. Se o MCU desce o sinal antes de tW (caso normal), o limitador não atua. Se o MCU ainda estiver em nível alto quando tW termina, a saída cai sozinha. No reset ou com o MCU travado em nível alto, o canal fica desligado ✅.
 
-**De onde vêm os 5 ms.** `tW = K · Rext · Cext` com Rext = 100 kΩ, Cext = 100 nF → R·C = 10 ms; K ≈ 0,45 (5 V) a 0,55 (2 V) segundo o datasheet da família, ≈ 0,5 em 3,3 V → ≈ 5 ms.
+**Componentes:**
 
-**De onde vem o ±20%** (soma de fontes, valores típicos):
-
-| Fonte | Variação |
-|---|---|
-| Resistor 100 kΩ (assumindo 1%) | ±1% |
-| Capacitor X7R 100 nF, tolerância inicial J | ±5% |
-| X7R com temperatura (−55…125 °C) | até ±15% |
-| K entre exemplares/fabricantes e com Vcc | ≈ ±10% (não garantido em datasheet) |
-| **Soma quadrática** | **≈ ±19% → 4,1 a 5,9 ms** |
-| **Soma linear (pior caso)** | **≈ ±31% → 3,5 a 6,5 ms** |
-
-**O clone.** O BOM usa `SN74HC123DR(LX)` (Lingxing). É pino a pino compatível, mas a fórmula e o K acima são das versões TI/NXP; o datasheet do LX não foi consultado. Meça o tW real na placa.
-
-**Consequência real (não é só proteção).** Se o firmware pedir dwell maior que tW, a saída cai em tW e a **centelha ocorre antes do instante calculado**, adiantando o ponto. Erro angular ≈ (dwell − tW) × rpm × 0,006 °:
-
-| dwell − tW | 3000 rpm | 6000 rpm |
+| Ref. | Valor | Especificação |
 |---|---|---|
-| 0,5 ms | 9° | 18° |
-| 1,0 ms | 18° | 36° |
+| R27, R28 | 120 kΩ | 1206, ±0,1%, 25 ppm/°C, filme fino (ex.: Yageo RT1206BRD07120KL) |
+| C15, C18 | 100 nF | 1206, C0G/NP0, ±5% ou melhor, 50 V (ex.: Murata GRM31C5C1H104JA01L) |
 
-**Limite do circuito.** O 74HC123 é retriggerável: pulsos de IGN mais rápidos que tW mantêm a janela aberta. Ele protege contra **nível alto preso**, não contra oscilação rápida do MCU.
+**Cálculo.** `tW = K · Rext · Cext` (datasheet NXP, válida para Cext > 10 nF; K = 0,45 em 5 V). Em 3,3 V, K ≈ 0,5 (interpolação, não está no datasheet) → 0,5 × 120 kΩ × 100 nF = **6,0 ms**.
 
-**Como dimensionar.** Escolha tW nominal ≥ dwell máximo ÷ 0,7 (cobre −30%). Exemplo: dwell máximo 4 ms → tW nominal ≥ 5,7 ms → Rext = tW ÷ (K · Cext) ≈ 130 kΩ (≈ 6,5 ms; mínimo no pior caso ≈ 4,5 ms; máximo ≈ 8,5 ms, conferir se a bobina aguenta). Um trimpot multivoltas em série permite ajustar na bancada.
+**Incerteza.** Resistor ±0,35% (tolerância + deriva) e C0G ±5% (±0,3% de deriva). O maior termo é o K, não documentado para o clone LX (estimativa ±5–10%). **Total estimado ±7 a ±11% antes da calibração → ≈ 5,4 a 6,6 ms.**
 
-**Como medir.** Segurar `IGN_A` em nível alto por ~20 ms e medir a largura do pulso em U9 pino 13 (1Q) e em `IGN_A_PROT`; repetir com spray frio/soprador e com 3V3 ligeiramente diferente. K = tW ÷ (Rext · Cext).
+**Calibração na primeira placa:** segurar `IGN_A` em nível alto por ~20 ms, medir a largura do pulso no pino 13 do U9 (1Q) e em `IGN_A_PROT`, repetir com spray frio e soprador. K = tW ÷ (Rext · Cext). Ajustar R27/R28:
 
-#### 3.2.2 Valores escolhidos: tW nominal = 6 ms, com C0G e resistor 0,1%
-
-Fórmula (datasheet NXP 74HC123, válida para Cext > 10 nF; K = 0,45 em 5 V, 100 nF × 10 kΩ → 450 µs): `tW = K · Rext · Cext`. O K em 3,3 V (≈ 0,5) e o do clone LX não estão no datasheet.
-
-| Ref. | Valor | Especificação | Observação |
-|---|---|---|---|
-| R27, R28 | **120 kΩ** | **1206**, ±0,1%, 25 ppm/°C, filme fino | LCSC: Yageo RT1206BRD07120KL (C136888) ou Yageo RP1206BRD07120KL (C6982931). Evitar RT1206FRD07120KL (±1%) e RT1206CRD07120KL (±0,25%) |
-| C15, C18 | **100 nF** | C0G/NP0, ±5% (ou melhor), 50 V, **1206** | LCSC: Murata GRM31C5C1H104JA01L (C97946), Murata GRM3195C1H104JA05D (C363929), TDK C3216C0G1H104JT000N (C319186), Walsin 1206N104J500CT (C170182) |
-
-Footprints dos quatro alterados para 1206 pelo projetista (mais oferta de 0,1% e de C0G nesse tamanho). Depois da mudança, refazer a verificação layout × netlist com os novos arquivos.
-
-R para tW = 6 ms conforme o K real (calibrar com a medição):
-
-| K medido | Rext ideal | Valor E96 mais próximo | tW resultante |
-|---|---|---|---|
-| 0,45 | 133,3 kΩ | 133 kΩ | 5,99 ms |
-| 0,50 | 120,0 kΩ | 120 kΩ | 6,00 ms |
-| 0,55 | 109,1 kΩ | 110 kΩ | 6,05 ms |
-
-Faixa esperada com esses componentes: resistor ±0,35% (0,1% + deriva), C0G ±5% + ±0,3% (ou ±1–2% se usar tolerância F/G), restando o K como maior incerteza (estimativa ±5–10%, não documentada para o clone). **Estimativa total ≈ ±7 a ±11% antes da calibração**, contra ≈ ±19% do projeto anterior. Montar a primeira placa com 120 kΩ, medir tW (seção 3.2.1), calcular K e ajustar Rext. O limite máximo esperado passa a ≈ 6,5–6,7 ms; confirme que a bobina suporta isso. Com tW mínimo ≈ 5,4 ms, o dwell máximo do firmware deve ficar em ≈ 4,8 ms ou menos.
-
-### 3.3 Atraso e velocidade
-
-- Subida: IGN_A → saída ≈ 3–4 µs (filtro RC + portas + transistores). Irrelevante para dwell.
-- Descida (centelha): corte imediato pela porta AND. O BC807 em saturação tem tempo de armazenamento de ~1–2 µs. Irrelevante para o avanço.
-- Em 8000 rpm cada saída dispara uma vez por volta (7,5 ms). Com dwell máximo de 5 ms sobram ≥ 2,5 ms de recuperação do 74HC123 ✅.
-
-### 3.4 ❌ Acoplamento entre as saídas A e B (modo 12 V)
-
-`D13` e `D14` (zeners 4,7 V, catodos em `IGN_B_PROT`/`IGN_A_PROT`) têm os ânodos ligados ao **mesmo nó**, que é o coletor do `Q7`. Com Q7 **desligado** (modo 12 V), esse nó fica flutuando:
-
-- Quando A dispara (≈ 9–10 V), D14 conduz em ruptura (4,7 V) e eleva o nó comum.
-- D13 conduz em **direta** (0,7 V) para o `IGN_B_PROT`, que deveria ficar em 0 V.
-
-Simulação DC (modelo simples; A disparado, B desligado, modo 12 V):
-
-| Impedância de entrada da bobina | V_A | V_B (deveria ser 0 V) |
+| K medido | Rext para 6 ms | Valor E96 |
 |---|---|---|
-| sem carga (só os 10 kΩ) | 9,3 V | **3,9 V** |
-| 5 kΩ | 7,6 V | **2,2 V** |
-| 2 kΩ | 6,3 V | **0,9 V** |
-| ≤ 1 kΩ | ≤ 5 V | ≈ 0 V |
+| 0,45 | 133,3 kΩ | 133 kΩ |
+| 0,50 | 120,0 kΩ | 120 kΩ |
+| 0,55 | 109,1 kΩ | 110 kΩ |
 
-No modo 5 V (Q7 ligado) não há problema: o nó comum fica em ≈ 0,15 V.
+**Regras para o firmware:**
 
-Impacto: uma entrada de bobina com limiar de 2–3 V e impedância alta pode ser disparada pelo outro canal.
-
-**Correção recomendada: um BAS21C (catodo comum, o mesmo componente já usado em D2/D3/D8) em série com os dois zeners.** Ligação: pino 1 no ânodo do D14, pino 2 no ânodo do D13, pino 3 (catodo comum) no coletor do Q7. Com Q7 desligado, o diodo do canal que não disparou fica em reversa e bloqueia o acoplamento (V_B ≈ 0 V). O grampo do modo 5 V sobe cerca de 0,65–0,8 V, então troque os zeners:
-
-| Zener | Nível da saída no modo 5 V (simulado) |
-|---|---|
-| 4,7 V (atual, sem diodo) | ≈ 4,9 V |
-| 4,7 V + BAS21C | ≈ 5,6 V |
-| 4,3 V + BAS21C | ≈ 5,2 V |
-| 3,9 V + BAS21C | ≈ 4,8 V |
-
-A numeração 1/2 = ânodos e 3 = catodo comum é a do símbolo do projeto; confirme no datasheet do BAS21C-JS3 (ZRE, LCSC C779748) antes de desenhar. Na placa v1.1 é preciso separar o nó que liga os dois ânodos ao coletor do Q7 (retrabalho com fios); na próxima revisão, ajustar o layout. Alternativa mais cara: um transistor de clamp por canal.
-
-### 3.5 Capacidade de acionamento
-
-- Fonte de 1 kΩ: corrente de curto ≤ ≈ 11 mA. Serve para entradas de comando de bobinas inteligentes e módulos igniters. **Não aciona bobina simples nem entrada de baixa impedância.**
-- Confirme no datasheet da bobina: limiar de entrada, corrente de entrada e se aceita 12 V através de 1 kΩ (ou 5 V no modo clamp).
-- Modo padrão no reset = 12 V (Q7 desligado). Seguro, porque o canal está desabilitado até o MCU subir.
+- Dwell máximo ≤ ≈ 4,8 ms (abaixo do tW mínimo esperado, com margem).
+- Se o dwell pedido passar de tW, a saída cai em tW e a **centelha ocorre antes do instante calculado**. Erro ≈ (dwell − tW) × rpm × 0,006 °: 1 ms de excesso = 18° a 3000 rpm e 36° a 6000 rpm.
+- O 74HC123 é retriggerável: protege contra **nível alto preso**, não contra oscilação rápida do MCU.
+- Confirmar que a bobina suporta ≈ 6,7 ms de acionamento.
 
 ---
 
@@ -180,182 +110,104 @@ A numeração 1/2 = ânodos e 3 = catodo comum é a do símbolo do projeto; conf
 
 | Entrada | Circuito | Avaliação |
 |---|---|---|
-| **VR+** | R33 22 kΩ → IN1 do NCV1124; IN2 em GND; VR− no GND do conector; C33 47 pF | ✅ segue o datasheet (R1 = 22 kΩ). Entrada ±250 V, 5 V ±10%. Saída push-pull 0–5 V → divisor 10k/20k + 330 Ω → 3,33 V em PB3 (FT) |
-| Limiar VR | RAdj = R31 20 k + trimpot 0–5 k (20–25 k), INP1 ≈ 11 µA, VHYS = 160 mV | ✅ `VRS(+TRP) ≈ INP1·(RAdj − R1 − RRS) + VHYS` → **≈ 120–190 mV** ajustável (com RRS 0,5–2 kΩ) |
-| DIAG do NCV1124 | R34 10 kΩ para GND | ✅ modo normal |
-| **HALLIN** | 5 V → R44 10k → D8 → HALLIN; R42 33k → base de Q5; R43 47k; Q5/Q6 invertem duas vezes | ✅ aceita coletor aberto e saída até ~12–24 V (D8 bloqueia retorno). Limiar ≈ 1 V, **sem histerese** (ruído pode causar chaveamento duplo em sinal lento) |
-| **CKPIN** | R7 4,7 kΩ + clamp BAT54SW (3V3/GND) → PA0 | ✅ entrada lógica protegida. Sem pull-down: fica flutuando se desconectada |
-| **MAPSIG** | R3 10k + R4 15k (fator 0,6) + R6 1k + C8 100 nF + clamp | ✅ sensor 0,2–4,7 V (como o MAP FuelTech da tabela) → 0,12–2,82 V no ADC |
-| **IATIN** | R25 2,49 kΩ a 3V3, R26 10k, C11/C23 100 nF, clamp | ✅ para NTC de ar (≈ 2,5 kΩ a 20–25 °C). ⚠️ Não serve para 100–180 °C (ver análise do NTC anterior) |
-| I2C | U8 24C256 (0x50), U11 AHT20 (0x38)/BMP280 (0x76/0x77), pull-ups 4,7 kΩ | ✅ sem conflito de endereços |
+| VR+ | R33 22 kΩ → IN1 do NCV1124; IN2 em GND; VR− no GND do conector; C33 47 pF | ✅ conforme datasheet. Saída 0–5 V push-pull → divisor 10k/20k + 330 Ω → 3,33 V em PB3 (FT) |
+| Limiar VR | RAdj = R31 20 kΩ + trimpot 0–5 kΩ; INP ≈ 11 µA; VHYS 160 mV | ✅ ≈ 120–190 mV ajustável |
+| DIAG (NCV1124) | R34 10 kΩ para GND | ✅ modo normal |
+| HALLIN | 5 V → R44 10 kΩ → D8 → HALLIN; R42 33k/R43 47k; Q5/Q6 | ✅ coletor aberto e saída até ~12–24 V. ⚠️ limiar ≈ 1 V sem histerese |
+| D9 (BAT42W) | catodo na base de Q5 | ✅ polaridade conferida pela serigrafia |
+| CKPIN | R7 4,7 kΩ + clamp BAT54SW → PA0 | ✅ sem pull-down (flutua se desconectada) |
+| MAPSIG | 10k/15k (fator 0,6) + 1 kΩ + 100 nF + clamp | ✅ 0,2–4,7 V → 0,12–2,82 V |
+| IATIN | pull-up 2,49 kΩ, 10 kΩ + 100 nF, clamp | ✅ NTC de ar. ⚠️ não serve para 100–180 °C |
+| I2C | 24C256 (0x50), AHT20 (0x38), BMP280 (0x76/77), pull-ups 4,7 kΩ | ✅ sem conflito |
 
-Os pinos PA15 e PB3 exigem remap do TIM2 para usar captura de entrada, e PA0 (TIM2_CH1 no mapeamento padrão) pode disputar o mesmo canal com o PA15 conforme o remap escolhido. Isso é decisão de firmware, mas vale planejar antes de fixar o pinout.
+Firmware: PA15 e PB3 exigem remap do TIM2 para captura, e PA0 (TIM2_CH1 padrão) pode disputar o canal com PA15 conforme o remap.
 
 ---
 
-## 5. Alimentação e proteção
+## 5. Alimentação, proteção e comunicação
+
+### 5.1 Alimentação
 
 | Bloco | Avaliação |
 |---|---|
-| **D6 SS56U** em série (proteção de inversão) | ✅ queda ≈ 0,4–0,55 V |
-| **D7 SMCJ18A** (TVS, VWM 18 V, VBR 20–22 V) | ⚠️ Na tensão de jump-start (24 V) o TVS conduz forte e pode queimar. Na **inversão de polaridade**, o TVS (antes do D6) fica em direta e **curto-circuita a bateria**: precisa de fusível externo. Alternativa: SMCJ24A, mas o grampo dele (VC = 38,9 V) fica acima dos 32 V de operação do AP63205; conferir o máximo absoluto do regulador antes de escolher. Colocar o TVS depois do diodo evita o curto em inversão de polaridade |
-| **U5 AP63205** (5 V, 2 A) | ✅ FB ligado ao 5 V (versão fixa), EN em VIN, L1 4,7 µH, 2× 22 µF, BST 100 nF. É o circuito típico do datasheet (VIN 3,8–32 V). C29/C30 são 22 µF/16 V X5R: perdem capacitância com 5 V, mas ficam acima do mínimo útil |
-| **U4 AMS1117-3.3** | ✅ queda 1,7 V × ~0,12 A ≈ 0,2 W. C5 eletrolítico (ESR adequada ao LDO) |
-| **VDDA** | ✅ R5 10 Ω + 4,7 µF + 100 nF + 1 µF |
-| **Reset/BOOT** | ✅ R8 10k + C16; BOOT0 com R10 10k + chave |
-| **Cristal 8 MHz** (ABM3, CL ≈ 18 pF) com 20 pF | ✅ CL efetiva ≈ 14–16 pF → pequeno desvio de frequência, sem importância |
-| **CAN** SN65HVD230 + R2 10k (slope control, 15 V/µs) + termino. 120 Ω via SB1 | ✅ funcional. ⚠️ D1 SMBJ24CA não protege: o máximo absoluto no barramento é 16 V (a TVS só começa a limitar em 24 V). Capacitância da TVS pode arredondar bordas a 1 Mbps |
-| **Programação** CN2 (3V3, SWCLK PA14, SWDIO PA13, RESET, GND) | ✅ compatível com WCH-LinkE |
+| D6 SS56U em série | ✅ |
+| D7 SMCJ18A | 🔒 mantido (sem jump-start nem inversão na aplicação) |
+| U5 AP63205 (5 V) | ✅ FB no 5 V, EN em VIN, 4,7 µH, 2× 22 µF, BST 100 nF (circuito típico; VIN 3,8–32 V) |
+| U4 AMS1117-3.3 | ✅ ≈ 0,2 W; C5 eletrolítico |
+| VDDA | ✅ 10 Ω + 4,7 µF + 100 nF + 1 µF |
+| Reset / BOOT0 | ✅ 10 kΩ + 100 nF; BOOT0 com 10 kΩ + chave |
+| Cristal 8 MHz com 20 pF | ✅ pequeno desvio de CL, sem importância |
+| Programação CN2 | ✅ 3V3, SWCLK PA14, SWDIO PA13, RESET, GND (WCH-LinkE) |
+| UART J3 | ✅ PA9/PA10 com 100 Ω |
 
-#### 5.1 CAN com TVS SMCJ8 (decisão do projetista)
+### 5.2 CAN
 
-SMCJ8.0A: VRWM 8 V, VBR 8,89–9,83 V, VC 13,6 V @ 110 A, fuga 50–100 µA em 8 V (valores de listagens de distribuidores). O grampo de 13,6 V fica abaixo do máximo absoluto do SN65HVD230 (16 V) ✅. Cuidados:
+SN65HVD230 a 3,3 V, R2 10 kΩ no RS (slope control, 15 V/µs), terminação 120 Ω selecionável por SB1 ✅.
 
-- **Capacitância:** TVS de 1500 W têm capacitância alta (um SMBJ8.0CA de 600 W aparece com ≈ 4300 pF; o SMCJ deve ser igual ou maior, não achei o valor). Isso arredonda as bordas do CAN; a 500 kbps costuma passar, a 1 Mbps é arriscado. Verifique com o osciloscópio.
-- **Ligação:** um TVS de cada linha (CANH e CANL) para GND, não entre CANH e CANL.
-- **Unidirecional × bidirecional:** a SMCJ8.0A (unidirecional) grampeia o lado negativo em ≈ −0,7 V; a SMCJ8.0CA (bidirecional) grampearia em ≈ −13,6 V, muito além dos −4 V do transceiver. Para o HVD230 a unidirecional protege melhor, ao custo de limitar a faixa de modo comum negativa.
-| **J3** UART (PA9/PA10, 100 Ω em série) | ✅ |
+Proteção: nos arquivos atuais o D1 ainda é **SMBJ24CA ligado entre CANH e CANL**. A troca planejada é por SMCJ8 🔒. Cuidados para essa troca:
+
+- SMCJ8.0A: VRWM 8 V, VBR 8,89–9,83 V, VC 13,6 V (listagens de distribuidores), abaixo do máximo absoluto do HVD230 (16 V) ✅.
+- **Ligação:** um TVS de cada linha para GND (dois componentes), não entre CANH e CANL.
+- **Unidirecional (A):** grampeia o negativo em ≈ −0,7 V. A bidirecional (CA) iria a ≈ −13,6 V, além dos −4 V do transceiver.
+- **Capacitância:** TVS de 1500 W têm capacitância alta (milhares de pF; valor exato não encontrado). A 500 kbps costuma passar; a 1 Mbps, medir as bordas.
 
 ---
 
-## 6. Análise física (PCB)
+## 6. PCB
 
-### 6.1 Dados gerais (extraídos dos Gerbers)
+### 6.1 Dados gerais
 
-- Placa **71,9 × 63,4 mm**, 2 camadas, componentes nas duas faces.
-- **Planos de GND** nas duas faces: ≈ 3051 mm² (topo) e 2995 mm² (fundo), cerca de 66–67% da área.
-- Trilhas: **0,30 mm** em quase tudo (≈ 919 mm no topo e 866 mm no fundo). 0,50 mm em 7 segmentos. **3,0 mm** em 5 segmentos (a entrada `12V_IN`).
-- 98 vias com furo de 0,31 mm. Furos PTH 0,70 a 1,20 mm; 4 furos M3 (3,2 mm); 2 NPTH de 3,0 mm (pinos de posicionamento do Micro-Fit).
+- Placa 71,9 × 63,4 mm, 2 camadas, componentes nas duas faces (MCU, portas lógicas e Micro-Fit na face inferior).
+- Planos de GND nas duas faces, ≈ 66% da área cada.
+- Trilhas de 0,30 mm em quase tudo, 0,50 mm em poucos trechos, 3,0 mm na entrada `12V_IN`. Adequado para as correntes do módulo (< 0,2 A, exceto a entrada).
+- 98 vias com furo de 0,31 mm; 4 furos M3; 2 NPTH de 3 mm do Micro-Fit.
+- Espaçamento entre redes ≈ 0,3 mm, suficiente para 12 V e surtos de ≈ 29 V.
 
-### 6.2 Layout × netlist (verificação automática)
+### 6.2 Verificação layout × netlist (revisão 3)
 
-Extraí a conectividade do cobre e comparei com a netlist usando a posição dos pads (Pick&Place):
+Conectividade do cobre extraída dos Gerbers e comparada com a netlist pelas posições de pads do Pick&Place:
 
-- **94 componentes de 2 pinos** (resistores, capacitores, diodos, indutor): todos os 188 pads estão sobre cobre, **nenhuma rede de cobre carrega dois nomes da netlist (sem curtos) e nenhuma rede da netlist fica dividida (sem abertos)** ✅.
-- Transistores e diodos SOT-23/323, MCU (U1), U2, U3, U7, U8, U9, U10: **0 divergências** nos pinos verificáveis ✅.
-- Não verificados: U4, U5, U11, U12 e demais conectores (geometria de pads não confiável a partir do Pick&Place).
+- 94 componentes de 2 pinos (incluindo R27, R28, C15 e C18 em 1206): sem curtos e sem aberturas ✅.
+- Transistores e diodos SOT-23/323 (incluindo D15), MCU, U2, U3, U7, U8, U9, U10: 0 divergências ✅.
+- D13.2 ↔ D15.1, D14.2 ↔ D15.2, D15.3 ↔ coletor do Q7: três redes separadas, sem contato com GND ou `IGN_x_PROT` ✅.
+- Polaridade pela serigrafia: D6, D9, D13, D14 conferem ✅.
+- Não verificados: U4, U5, U11, U12 e os conectores.
 
-Polaridade dos diodos (serigrafia × netlist): D6, D13, D14 e D9 conferem ✅. O D9 (BAT42W no circuito do Hall) tem o catodo para a base de Q5, como no esquema.
-
-### 6.3 Comprimentos e larguras de trilhas relevantes
+### 6.3 Trilhas relevantes
 
 | Rede | Comprimento | Observação |
 |---|---|---|
-| `12V_IN` | 26 mm | 0,5–3,0 mm ✅ (corrente de entrada ≈ 0,1 A, sobra margem) |
-| `+12V` | 69 mm | 0,3–0,5 mm ✅ |
-| `+5V` | 131 mm | 0,3 mm ✅ (≈ 0,14 A, queda < 40 mV) |
-| `+3V3` | 289 mm | 0,3 mm ✅ |
-| `VR+` | 51 mm (16 topo, 35 fundo) | longo, mas é lado do sensor (baixa impedância); o R33 22 kΩ fica junto do NCV1124 ✅ |
-| `CKP_CAPTURE` | 61 mm | ⚠️ trecho de 4,7 kΩ de impedância percorre ~50 mm: sensível a ruído; melhor R7 e clamp junto ao MCU |
-| `MAPSIG` / `IATIN` | 60 mm cada | sinais de sensor, com filtros (C8, C11) ✅ |
-| `CANH` / `CANL` | 56 / 62 mm | par não roteado junto, mas o transceiver é diferencial e tolerante |
-| `OSC_IN` / `OSC_OUT` | 11–12 mm | ✅ cristal a ≈ 6 mm do MCU |
-| `IGN_A_PROT` / `IGN_B_PROT` | 29 / 43 mm | corrente baixa (≤ 11 mA) ✅ |
-| `U5_5` (nó SW do buck) | 13 mm | 0,3 mm, aceitável pela corrente média baixa; pode irradiar mais que o necessário |
+| `12V_IN` | 26 mm | 0,5–3,0 mm ✅ |
+| `+5V` / `+3V3` | 131 / 289 mm | 0,3 mm, quedas desprezíveis ✅ |
+| `VR+` | 51 mm | lado do sensor (baixa impedância); R33 junto do NCV1124 ✅ |
+| `CKP_CAPTURE` | 61 mm | ⚠️ trecho em 4,7 kΩ; melhor R7 e clamp perto do PA0 |
+| `MAPSIG` / `IATIN` | 60 mm cada | com filtros ✅ |
+| `CANH` / `CANL` | 56 / 62 mm | não roteados como par; tolerável |
+| `OSC_IN` / `OSC_OUT` | 11–12 mm | cristal a ≈ 6 mm do MCU ✅ |
+| Nó SW do buck | 13 mm | aceitável |
 
-### 6.4 Pontos de atenção físicos
+### 6.4 Pontos físicos de atenção
 
-- **Larguras de 0,3 mm** suportam as correntes deste módulo (tudo abaixo de ≈ 0,2 A, exceto picos do buck). Não há problema de queda ou aquecimento.
-- Espaçamento ≈ 0,3 mm entre redes: aceitável para 12 V e picos de ≈ 29 V (clamp do TVS).
-- **NPTH de 3 mm do Micro-Fit** fica a ≈ 0,3 mm da borda inferior da placa: fabricável, mas frágil. Considere afastar 0,5 mm ou mais.
-- Layout espelhado frente/verso (D4/D5, Q3/Q4, R22/R23 etc. no mesmo XY): estilo funcional, mas exige montagem nas duas faces (custo maior).
-- O MCU, as portas lógicas e o Micro-Fit ficam na **face inferior**. A placa fica "de cabeça para baixo" na caixa.
-- Sem fusível no esquema (necessário por causa do TVS antes do diodo).
+- ⚠️ NPTH de 3 mm do Micro-Fit a ≈ 0,3 mm da borda inferior (fabricável, frágil).
+- ⚠️ Numeração do Micro-Fit: o símbolo numera 1/2, 3/4… lado a lado; o padrão Molex costuma ser 1–6 numa fileira e 7–12 na outra. Conferir com o chicote.
+- ⚠️ Módulo U11 (footprint próprio, sem código de peça): conferir a ordem VDD/SDA/GND/SCL com o módulo real.
+- Layout espelhado frente/verso (D4/D5, Q3/Q4, R22/R23 etc. no mesmo XY): funcional, exige montagem nas duas faces.
 
 ---
 
-## 7. Tabelas finais
+## 7. Histórico de revisões
 
-### 7.1 O que vai funcionar ✅
-
-- Alimentação: diodo série, AP63205 → 5 V, AMS1117 → 3,3 V.
-- MCU: pinagem do símbolo confere com o datasheet do CH32V203K8T6 (LQFP32), cristal, reset, boot, SWD, UART, CAN e I2C.
-- CAN com SN65HVD230 e terminação selecionável.
-- Condicionador de VR (NCV1124) com limiar ajustável ≈ 120–190 mV.
-- Condicionador Hall (com ressalva de histerese).
-- Leitura de MAP e IAT (ar).
-- Cadeia de ignição lógica: habilitação por hardware, limitador de dwell, drive PNP, modos 12 V/5 V (com a ressalva do acoplamento), failsafe no reset.
-- Roteamento coerente com a netlist (sem curtos/abertos nos pinos verificados).
-
-### 7.2 O que não vai funcionar como projetado ❌
-
-1. ~~Saídas A/B acopladas no modo 12 V (zeners D13/D14, item 3.4)~~: **resolvido na revisão 2** (seção 10). Nenhum item do circuito falha mais por projeto; restam apenas os riscos da seção 7.3.
-
-### 7.3 O que pode falhar na prática ⚠️
-
-1. Dwell limitado a ≈ 5 ms (tolerância ±20%): pode cortar dwell em baixa tensão e adiantar a centelha.
-2. TVS D7 18 V: jump-start de 24 V e inversão de polaridade (curto via TVS) exigem fusível/TVS adequado.
-3. Pinagem física de U11 (módulo AHT20+BMP280, sem MPN no BOM) e de U12 (Micro-Fit 2×6): conferir contra a peça e o chicote antes de ligar. O símbolo numera 1/2, 3/4... lado a lado; o Micro-Fit da Molex costuma numerar 1–6 em uma fileira e 7–12 na outra, então a numeração do footprint pode não coincidir com a do chicote.
-4. Proteção do CAN não protege o transceiver acima de 16 V.
-5. Hall sem histerese; CKP_CAPTURE com ~50 mm em 4,7 kΩ.
-6. BOM incompleto (U3, D7, U11, SW1 sem número de peça; BOBINA-OUT na Robu, resto LCSC): fecha a montagem só depois de completar.
-
----
-
-## 8. Correções recomendadas (ordem de prioridade)
-
-1. **D13/D14**: um clamp por canal, ou diodo de sinal em série com cada zener (e zener 4,3 V).
-2. **Dwell**: ajustar R27/R28 (trimpot) para o limite que a sua bobina precisa; medir tW real do 74HC123 (LX) com osciloscópio.
-3. **Entrada 12 V**: TVS SMCJ24A depois do D6 (ou mantê-lo e adicionar fusível/PTC antes); fusível de 3 A no chicote.
-4. **Conferir pinagem** do U11 e do U12 contra o datasheet/chicote.
-5. CAN: TVS de baixa capacitância própria para CAN (ex.: PESD2CAN), com ligação ao GND.
-6. Hall: adicionar histerese (Schmitt) se o sinal for lento.
-7. Mover R7 + D12 para perto do PA0 ou reduzir a impedância do trecho longo.
-8. Afastar o NPTH de 3 mm da borda.
-
----
-
-## 9. Método e limites desta análise
-
-- Esquemático lido a partir do SVG (renderizado) e da netlist PADS; datasheets consultados: CH32V203 (V2.7), NCV1124, 74HC123 (fórmula do K), SN65HVD230, AP63205.
-- Layout: Gerbers lidos com gerbonara; cobre convertido em geometria; ligações camada a camada pelos furos; posições de pads inferidas do Pick&Place (pad 1 + passo). A verificação cobre passivos, SOT-23/323 e CIs principais; não cobre conectores nem U4/U5/U11.
-- Simulação do acoplamento (3.4) é um modelo DC simples (zener 4,7 V, queda direta 0,7 V). A faixa real depende da entrada da bobina.
-- **Não foi feita** simulação transitória, análise de EMC, medição real nem teste de bancada. O dwell (≈ 5 ms) vem da fórmula do datasheet e precisa de confirmação no osciloscópio.
-
----
-
-## 10. Revisão 2 (arquivos `*_2`, Gerbers gerados às 11:08)
-
-### 10.1 O que mudou (comparado com a revisão 1)
-
-| Item | Antes | Agora |
+| Rev. | Mudança | Resultado |
 |---|---|---|
-| D13, D14 (zeners) | MM1Z4V7, SOD-123 | **MM3Z4V3** (ST, LCSC C61849), SOD-323 |
-| D15 | não existia | **BAS21C-JS3** (ZRE, C779748), SOT-23, catodo comum |
-| Rede `Q7_3` | ânodo D13 + ânodo D14 + coletor Q7 | separada em `D13_2` (D13.2 + D15.1), `D14_2` (D14.2 + D15.2) e `Q7_3` (Q7.3 + D15.3) |
-| Demais componentes e redes | – | **idênticos** (diferenças no BOM/PnP são só de nome: BAT54SW, BAT42W, SMAJ18A etc.) |
-
-Os Gerbers mudaram **somente** na região x 41–53 mm, y −52…−41 mm (zona de D13/D14/D15/Q7): 1 via removida, 2 vias adicionadas, retraçado local.
-
-### 10.2 Verificação
-
-- **Netlist:** única mudança é a descrita acima.
-- **Cobre × netlist (Gerbers v2):** D13.2 = D15.1, D14.2 = D15.2, D15.3 = Q7.3; as três redes são distintas entre si e não tocam GND nem as redes `IGN_x_PROT`. D13.1 está em `IGN_B_PROT`, D14.1 em `IGN_A_PROT`, Q7.2 em GND ✅.
-- **Verificação global:** 94 componentes de 2 pinos e os transistores/CIs verificáveis continuam sem curtos nem abertos ✅.
-- **Polaridade dos zeners novos:** a serigrafia do D13 (topo) e do D14 (fundo) marca o catodo no pad 1, que vai para `IGN_x_PROT` ✅.
-- **Pinagem do BAS21C:** o datasheet da SXSEMI (marcação JS3, a mesma do código `BAS21C-JS3`) mostra pinos 1 e 2 como ânodos e pino 3 como catodo comum; VRRM 250 V, fuga ≤ 0,1 µA a 200 V, trr ≤ 50 ns ✅. Não achei o datasheet da ZRE, só o da SXSEMI com a mesma marcação.
-- **Simulação DC (modo 12 V):** com o BAS21C bloqueando, o canal desligado fica em ≈ 0 V para qualquer impedância de entrada da bobina. O acoplamento de até 3,9 V da revisão 1 desaparece.
-
-### 10.3 Nível da saída no modo 5 V com os novos zeners
-
-Zener 4,3 V + BAS21C + Vce(sat) do Q7 → **≈ 5,1 V** típico. Pela listagem da LCSC o MM3Z4V3 (ST) tem Vz 4,0–4,6 V, então o nível real fica entre **≈ 4,8 e 5,4 V**. Confira se a entrada da bobina aceita até 5,4 V. Zzt listada: 130 Ω (a 5 mA; o grampo opera em ≈ 5–6 mA).
-
-### 10.4 Pendências (não mudaram)
-
-1. Dwell limitado a ≈ 5 ms (R27/R28 100 kΩ, C15/C18 100 nF X7R, clone LX).
-2. D7 SMCJ18A (jump-start de 24 V; inversão de polaridade via TVS). Ver nota sobre o clamp do SMCJ24A na seção 5.
-3. D4/D5 continuam SMAJ18A (VC = 29,2 V). SMAJ15A (VC = 24,4 V) ou SMAJ16A (26,0 V) protegem melhor o nó de saída; ver tabela da família SMAJ.
-4. D13/D14 agora são SOD-323 (listagens de 200 a 300 mW): menos robustos a surtos do chicote do que o SOD-123 de 500 mW.
-5. Pinagem física do módulo U11 (AHT20+BMP280) e do conector U12 (Micro-Fit).
-6. Proteção do CAN (D1 SMBJ24CA) acima do máximo absoluto do SN65HVD230 (16 V).
-7. Hall sem histerese; `CKP_CAPTURE` com ≈ 50 mm de trilha em 4,7 kΩ; NPTH de 3 mm a ≈ 0,3 mm da borda.
+| 1 | Versão inicial | Acoplamento entre saídas no modo 12 V (zeners D13/D14 com coletor do Q7 comum) |
+| 2 | D15 (BAS21C) em série com os zeners; D13/D14 → MM3Z4V3 SOD-323 | Acoplamento eliminado; cobre mudou só na região do D13–D15/Q7 |
+| 3 | R27/R28 → 120 kΩ 1206; C15/C18 → 1206 | Limitador em 6 ms; cobre mudou só na região desses quatro componentes |
 
 ---
 
-## 11. Revisão 3 (Gerbers gerados às 12:03, PnP "CH32V_v1.1")
+## 8. Método e limites
 
-**Mudanças em relação à revisão 2:** só R27, R28, C15 e C18 passaram para 1206, e R27/R28 de 100 kΩ para 120 kΩ. Netlist sem nenhuma alteração de ligação. Cobre alterado apenas na face superior, em x 57,5–70,2 mm, y −66,7…−50,5 mm (região desses quatro componentes); nenhum furo adicionado ou removido; ≈ 1,7 mm até a borda da placa.
-
-**Verificação layout × netlist:** 94 componentes de 2 pinos, transistores e CIs verificáveis sem curtos nem abertos ✅.
-
-**BOM:** usado só para os nomes dos componentes, a pedido do projetista; códigos de fabricante e fornecedor não foram avaliados. As peças pretendidas para R27/R28 (120 kΩ 0,1% 25 ppm/°C, 1206) e C15/C18 (100 nF C0G, 1206) estão na seção 3.2.2.
+- Esquemático lido do SVG renderizado e da netlist PADS. Datasheets consultados: CH32V203 (V2.7), NCV1124, 74HC123 (NXP), SN65HVD230, AP63205, família SMAJ, BAS21C (SXSEMI).
+- Layout: Gerbers convertidos em geometria (gerbonara/shapely), camadas ligadas pelos furos, pads posicionados a partir do Pick&Place.
+- Simulações: modelo DC simples para o grampo e o acoplamento.
+- **Não foram feitos** simulação transitória, análise de EMC, DRC formal nem testes de bancada. O tW de 6 ms vem da fórmula do datasheet e precisa ser medido.
