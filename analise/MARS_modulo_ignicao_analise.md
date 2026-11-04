@@ -20,6 +20,13 @@ O projeto é coerente e a maior parte funciona. O layout (PCB) **bate com a netl
 | 5 | Proteção do CAN (SMBJ24CA) não protege o SN65HVD230 (máx. absoluto 16 V no barramento) | ⚠️ baixo para 12 V, ruim para 24 V |
 | 6 | Entrada de IAT com pull-up de 2,49 kΩ serve para ar (−20…100 °C), não para 100–180 °C | ⚠️ depende do uso |
 
+**Decisões do projetista (revisão 2), que prevalecem sobre as recomendações abaixo:**
+
+- **D7 (SMCJ18A):** jump-start de 24 V e inversão de polaridade não existem na aplicação; preocupação descartada (itens 3 e a nota do SMCJ24A na seção 5 ficam como referência, sem ação).
+- **D4/D5 (SMAJ18A):** mantidos; a troca por SMAJ15A/16A não traz ganho que justifique.
+- **D13/D14 (MM3Z4V3, SOD-323):** mantidos.
+- **CAN (D1):** será trocado por um TVS SMCJ8 (ver 5.1).
+
 ---
 
 ## 2. O que o circuito faz (visão geral)
@@ -70,6 +77,38 @@ Consequências:
 - Dwell típico de bobina inteligente é 2–4 ms a 13,5 V. Na partida (bateria 8–10 V) algumas bobinas pedem mais. O limite fixo ≈ 5 ms pode ser curto.
 - Recomendação: manter o dwell do firmware ≤ ≈ 3,5 ms, ou trocar R27/R28 por um valor/trimpot para ajustar o limite à bobina real.
 - Failsafe ✅: com o MCU travado em nível alto, a saída cai sozinha depois de tW, e no reset o canal fica desligado.
+
+#### 3.2.1 Como ler o limite de ≈ 5 ms
+
+**O que ele faz.** O 74HC123 é disparado pela borda de subida de `IGN_x_ENABLED` e mantém `DWELL_WINDOW_x` em nível alto por tW. A saída só fica ligada enquanto o MCU E a janela estão em nível alto. Se o MCU desce a linha antes de tW (caso normal), o limitador é invisível. Se o MCU ainda estiver em nível alto quando tW acaba, a saída cai por conta própria.
+
+**De onde vêm os 5 ms.** `tW = K · Rext · Cext` com Rext = 100 kΩ, Cext = 100 nF → R·C = 10 ms; K ≈ 0,45 (5 V) a 0,55 (2 V) segundo o datasheet da família, ≈ 0,5 em 3,3 V → ≈ 5 ms.
+
+**De onde vem o ±20%** (soma de fontes, valores típicos):
+
+| Fonte | Variação |
+|---|---|
+| Resistor 100 kΩ (assumindo 1%) | ±1% |
+| Capacitor X7R 100 nF, tolerância inicial J | ±5% |
+| X7R com temperatura (−55…125 °C) | até ±15% |
+| K entre exemplares/fabricantes e com Vcc | ≈ ±10% (não garantido em datasheet) |
+| **Soma quadrática** | **≈ ±19% → 4,1 a 5,9 ms** |
+| **Soma linear (pior caso)** | **≈ ±31% → 3,5 a 6,5 ms** |
+
+**O clone.** O BOM usa `SN74HC123DR(LX)` (Lingxing). É pino a pino compatível, mas a fórmula e o K acima são das versões TI/NXP; o datasheet do LX não foi consultado. Meça o tW real na placa.
+
+**Consequência real (não é só proteção).** Se o firmware pedir dwell maior que tW, a saída cai em tW e a **centelha ocorre antes do instante calculado**, adiantando o ponto. Erro angular ≈ (dwell − tW) × rpm × 0,006 °:
+
+| dwell − tW | 3000 rpm | 6000 rpm |
+|---|---|---|
+| 0,5 ms | 9° | 18° |
+| 1,0 ms | 18° | 36° |
+
+**Limite do circuito.** O 74HC123 é retriggerável: pulsos de IGN mais rápidos que tW mantêm a janela aberta. Ele protege contra **nível alto preso**, não contra oscilação rápida do MCU.
+
+**Como dimensionar.** Escolha tW nominal ≥ dwell máximo ÷ 0,7 (cobre −30%). Exemplo: dwell máximo 4 ms → tW nominal ≥ 5,7 ms → Rext = tW ÷ (K · Cext) ≈ 130 kΩ (≈ 6,5 ms; mínimo no pior caso ≈ 4,5 ms; máximo ≈ 8,5 ms, conferir se a bobina aguenta). Um trimpot multivoltas em série permite ajustar na bancada.
+
+**Como medir.** Segurar `IGN_A` em nível alto por ~20 ms e medir a largura do pulso em U9 pino 13 (1Q) e em `IGN_A_PROT`; repetir com spray frio/soprador e com 3V3 ligeiramente diferente. K = tW ÷ (Rext · Cext).
 
 ### 3.3 Atraso e velocidade
 
@@ -146,6 +185,14 @@ Os pinos PA15 e PB3 exigem remap do TIM2 para usar captura de entrada, e PA0 (TI
 | **Cristal 8 MHz** (ABM3, CL ≈ 18 pF) com 20 pF | ✅ CL efetiva ≈ 14–16 pF → pequeno desvio de frequência, sem importância |
 | **CAN** SN65HVD230 + R2 10k (slope control, 15 V/µs) + termino. 120 Ω via SB1 | ✅ funcional. ⚠️ D1 SMBJ24CA não protege: o máximo absoluto no barramento é 16 V (a TVS só começa a limitar em 24 V). Capacitância da TVS pode arredondar bordas a 1 Mbps |
 | **Programação** CN2 (3V3, SWCLK PA14, SWDIO PA13, RESET, GND) | ✅ compatível com WCH-LinkE |
+
+#### 5.1 CAN com TVS SMCJ8 (decisão do projetista)
+
+SMCJ8.0A: VRWM 8 V, VBR 8,89–9,83 V, VC 13,6 V @ 110 A, fuga 50–100 µA em 8 V (valores de listagens de distribuidores). O grampo de 13,6 V fica abaixo do máximo absoluto do SN65HVD230 (16 V) ✅. Cuidados:
+
+- **Capacitância:** TVS de 1500 W têm capacitância alta (um SMBJ8.0CA de 600 W aparece com ≈ 4300 pF; o SMCJ deve ser igual ou maior, não achei o valor). Isso arredonda as bordas do CAN; a 500 kbps costuma passar, a 1 Mbps é arriscado. Verifique com o osciloscópio.
+- **Ligação:** um TVS de cada linha (CANH e CANL) para GND, não entre CANH e CANL.
+- **Unidirecional × bidirecional:** a SMCJ8.0A (unidirecional) grampeia o lado negativo em ≈ −0,7 V; a SMCJ8.0CA (bidirecional) grampearia em ≈ −13,6 V, muito além dos −4 V do transceiver. Para o HVD230 a unidirecional protege melhor, ao custo de limitar a faixa de modo comum negativa.
 | **J3** UART (PA9/PA10, 100 Ω em série) | ✅ |
 
 ---
