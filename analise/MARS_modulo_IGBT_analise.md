@@ -5,6 +5,8 @@
 
 **Decisão do projetista:** a placa de potência fica separada do módulo principal (a integração exigiria isolação de alta tensão, terra de potência e dissipação dentro da placa principal). Bobina inteligente continua sendo atendida diretamente pelo módulo principal.
 
+**Decisão do projetista:** a isolação dos coletores (seção 4.1) foi considerada irrelevante para estas placas; seções 4.1 e 4.1.1 ficam só como referência.
+
 Legenda: ✅ confere · ⚠️ ressalva · ❌ problema.
 
 ---
