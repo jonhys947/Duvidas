@@ -97,6 +97,19 @@ Correções:
 - Afastar a área de cobre do Q1 do furo/pad do SCREW1, ou usar furo sem pad (NPTH) ali.
 - Não passar trilha de coletor entre pinos do CN1; chegar a cada pino pelo lado de fora.
 
+### 4.1.1 Placas já fabricadas (mitigação)
+
+As placas desta revisão já foram produzidas. Uma folga de 0,18–0,30 mm limpa e seca não abre arco imediatamente em 425 V (o ar só rompe na casa de 1 kV nessa distância). O risco é de longo prazo: umidade, resíduo de fluxo e sujeira formam trilha condutiva na superfície. Para usar estas placas:
+
+1. Lavar bem com álcool isopropílico (sem resíduo de fluxo) e secar.
+2. **Verniz conformal** (acrílico, silicone ou uretano) em toda a área dos coletores, do CN1 e das abas, nas duas faces.
+3. **SCREW1 com parafuso ou espaçador de nylon** (ou arruela isolante), para o pad não ficar no potencial do chassi.
+4. Opcional: raspar o plano de GND em volta das áreas de cobre das abas para alargar a folga (só o plano, não as trilhas de coletor).
+5. Caixa fechada, protegida de água e óleo.
+6. Depois dos testes de bancada (inclusive com secundário aberto), inspecionar com lupa a região do CN1 em busca de marcas de arco.
+
+Na próxima revisão, aplicar as distâncias da seção 4.1.
+
 ### 4.2 ⚠️ Térmica e energia
 
 Estimativa (depende da bobina e do balastro): corrente média ≈ 3,5 A durante o dwell, VCE(sat) ≈ 1,2–1,5 V → ≈ 4–5 W enquanto conduz, mais ≈ 4–6,5 mJ de perda no desligamento a cada disparo (Eoff do datasheet a 10 A; menor com corrente menor). Com dwell de 3–4,8 ms por volta (cada canal dispara uma vez por volta em centelha perdida), a ciclagem fica em 30–55% → **≈ 1,5–3 W médios por IGBT** a 6000 rpm. Com ≈ 3,5 cm² de cobre por face, algo como 40–50 °C/W: elevação de 60–150 °C sobre o ambiente. Num cofre a 85 °C pode chegar perto dos 175 °C de junção.
