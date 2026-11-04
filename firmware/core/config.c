@@ -32,7 +32,7 @@ void config_seal(config_t *c)
 void config_defaults(config_t *c)
 {
     static const uint16_t rpm[ADV_NX] = {500, 800, 1000, 1250, 1500, 2000, 2500, 3000,
-                                         3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000};
+                                         3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000};
     static const uint16_t kpa[ADV_NY] = {20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 200};
 
     memset(c, 0, sizeof(*c));
@@ -43,7 +43,7 @@ void config_defaults(config_t *c)
     c->tooth0_deg10 = 3600 - 1200;   /* exemplo: PMS do cil. 1 no 20º dente após a falha; AJUSTAR no motor */
     c->coil_type = COIL_SMART_5V;
 
-    c->rev_limit_rpm = 6800;
+    c->rev_limit_rpm = 8000;
     c->rev_hyst_rpm = 200;
     c->crank_rpm = 400;
     c->crank_adv_deg10 = 100;        /* 10° na partida */
@@ -75,8 +75,8 @@ void config_defaults(config_t *c)
     memcpy(c->dwell_mv, dv_mv, sizeof(dv_mv));
     memcpy(c->dwell_us_v, dv_us, sizeof(dv_us));
     /* teto por rotação (em rotação alta não há tempo nem necessidade de dwell longo) */
-    static const uint16_t dw_rpm[DWELL_N] = {0, 1000, 2000, 3000, 4000, 5000, 6000, 7000};
-    static const int16_t  dw_us[DWELL_N]  = {4800, 4800, 4800, 4500, 4200, 4000, 3800, 3600};
+    static const uint16_t dw_rpm[DWELL_N] = {0, 1000, 2000, 3000, 4000, 5000, 6500, 8000};
+    static const int16_t  dw_us[DWELL_N]  = {4800, 4800, 4800, 4500, 4200, 4000, 3700, 3400};
     memcpy(c->dwell_rpm, dw_rpm, sizeof(dw_rpm));
     memcpy(c->dwell_us, dw_us, sizeof(dw_us));
     c->vbat_default_mv = 12000;   /* conservador: dwell um pouco maior que a 13,5 V */

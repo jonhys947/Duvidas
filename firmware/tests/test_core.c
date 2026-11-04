@@ -107,7 +107,7 @@ static result_t run(const config_t *c, profile_t p, int n_rev, uint16_t map_kpa,
 
 static void test_steady(const config_t *c)
 {
-    const double rpms[] = {800, 1000, 3000, 6000};
+    const double rpms[] = {800, 1000, 3000, 6000, 7900};
     for (unsigned i = 0; i < sizeof rpms / sizeof rpms[0]; i++) {
         profile_t p = {rpms[i], rpms[i], 0};
         result_t r = run(c, p, 20, 50, -1, -1, 0);
@@ -159,9 +159,9 @@ static void test_faults(const config_t *c)
 
 static void test_rev_limit(const config_t *c)
 {
-    profile_t p = {7200, 7200, 0};
+    profile_t p = {8300, 8300, 0};
     result_t r = run(c, p, 10, 50, -1, -1, 0);
-    printf("corte a 7200 rpm: dwells %d, centelhas %d\n", r.dwells, r.sparks);
+    printf("corte a 8300 rpm: dwells %d, centelhas %d\n", r.dwells, r.sparks);
     CHECK(r.cut_seen && r.dwells == 0, "limitador não cortou (%d dwells)", r.dwells);
 }
 
@@ -179,7 +179,7 @@ static void test_dwell_voltage(const config_t *c)
     printf("dwell: %u us a 13,5 V, %u us a 9 V, %u us sem leitura, %u us a 6500 rpm/8 V\n", d135, d9, dnone, dhi);
     CHECK(d135 == 2800 && d9 == 4400, "dwell por tensão (%u, %u)", d135, d9);
     CHECK(dnone == 3200, "dwell sem leitura de tensão (%u)", dnone);
-    CHECK(dhi <= 3800, "teto por rotação não aplicado (%u)", dhi);
+    CHECK(dhi <= 3700, "teto por rotação não aplicado (%u)", dhi);
     CHECK(d9 <= c->max_dwell_us, "dwell acima do máximo");
 }
 
